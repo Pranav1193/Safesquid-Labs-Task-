@@ -1,0 +1,116 @@
+#!/bin/bash
+
+# Function to display top 10 applications by CPU and memory usage
+show_top_apps() {
+    echo -e "\nTop 10 Applications by CPU Usage:"
+    ps aux --sort=-%cpu | awk 'NR==1; NR>1 {print $0 | "head -10"}'
+
+    echo -e "\nTop 10 Applications by Memory Usage:"
+    ps aux --sort=-%mem | awk 'NR==1; NR>1 {print $0 | "head -10"}'
+}
+
+# Function to display network monitoring information
+show_network() {
+    echo -e "\nNetwork Monitoring:"
+    echo "Concurrent connections: $(ss -tun | wc -l)"
+    echo "Packet drops: $(netstat -s | grep 'dropped' | awk '{sum += $1} END {print sum}')"
+    echo "MB in and out:"
+    ifconfig | awk '/RX packets/{print "In: " $5/1024/1024 " MB"} /TX packets/{print "Out: " $6/1024/1024 " MB"}'
+}
+
+# Function to display disk usage
+show_disk_usage() {
+    echo -e "\nDisk Usage:"
+    df -h | awk 'NR==1 || $5+0 > 80 {print $0}'
+}
+
+# Function to display system load and CPU breakdown
+show_system_load() {
+    echo -e "\nSystem Load:"
+    uptime
+    echo -e "\nCPU Usage Breakdown:"
+    top -bn1 | grep "Cpu(s)" | awk '{print "User: " $2 "%, System: " $4 "%, Idle: " $8 "%"}'
+}
+
+# Function to display memory usage
+show_memory_usage() {
+    echo -e "\nMemory Usage:"
+    free -h
+}
+
+# Function to display process monitoring information
+show_processes() {
+    echo -e "\nProcess Monitoring:"
+    echo "Active processes: $(ps aux | wc -l)"
+    echo -e "\nTop 5 Processes by CPU and Memory Usage:"
+    ps aux --sort=-%cpu,-%mem | head -n 6
+}
+
+# Function to display service monitoring information
+show_services() {
+    echo -e "\nService Monitoring:"
+    for service in sshd nginx apache2 iptables; do
+        if systemctl is-active --quiet $service; then
+            echo "$service is running"
+        else
+            echo "$service is not running"
+        fi
+    done
+}
+
+# Function to refresh the dashboard every few seconds
+refresh_dashboard() {
+    while true; do
+        clear
+        show_top_apps
+        show_network
+        show_disk_usage
+        show_system_load
+        show_memory_usage
+        show_processes
+        show_services
+        sleep 5
+    done
+}
+
+# Check for command-line switches
+if [[ $# -eq 0 ]]; then
+    # If no arguments, show the entire dashboard
+    refresh_dashboard
+else
+    # Show specific parts of the dashboard based on switches
+    while true; do
+        clear
+        for arg in "$@"; do
+            case $arg in
+                -cpu)
+                    show_top_apps
+                    ;;
+                -network)
+                    show_network
+                    ;;
+                -disk)
+                    show_disk_usage
+                    ;;
+                -load)
+                    show_system_load
+                    ;;
+                -memory)
+                    show_memory_usage
+                    ;;
+                -process)
+                    show_processes
+                    ;;
+                -services)
+                    show_services
+                    ;;
+                *)
+                    echo "Invalid option: $arg"
+                    echo "Valid options are: -cpu, -network, -disk, -load, -memory, -process, -services"
+                    exit 1
+                    ;;
+            esac
+        done
+        sleep 5
+    done
+fi
